@@ -13,7 +13,6 @@ class realTimeProvider:
             apiToken=self.apiToken, output="dataframe", symbolId=id)
         ref_price=output_meta.iloc[0,
                                        output_meta.columns.get_loc("priceReference")]
-        print(ref_price)
         current_price=output_chart.iloc[-1, output_chart.columns.get_loc("close")]
         if ref_price>current_price:
             graph=output_chart.plot(x="at",y='close',color='green')
@@ -28,7 +27,7 @@ class realTimeProvider:
         fig.savefig(buf,format='png')
         ret['Name'] = output_meta.iloc[0,
                                        output_meta.columns.get_loc("nameZhTw")]
-        ret['RealPrice'] = str(current_price)
+        ret['RealPrice'] = current_price
         ret['ID'] = id
         ret['photo']=buf
         return ret

@@ -5,8 +5,8 @@ from telegram.ext import CommandHandler
 from telegram.ext import MessageHandler, Filters
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import InlineQueryHandler
-from DataProvider import fugle
-
+from DataProvider import fugle, yahoo
+import datetime
 import os
 TOKEN_TG = os.getenv("TOKEN_TG")
 TOKEN_FUGLE = os.getenv("TOKEN_FUGLE")
@@ -17,20 +17,22 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 
 rtProvider = fugle.realTimeProvider(TOKEN_FUGLE)
+htProvider = yahoo.historyProvider()
 
 
 def start(update, context):
     context.bot.send_message(
-        chat_id=update.effective_chat.id, text="I'm a bot, please talk to me!"+argstr)
+        chat_id=update.effective_chat.id, text="I'm a bot, please talk to me!")
 
 
 def echo(update, context):
     query = update.message.text
     ret = rtProvider.getStockInfo(query)
-    result_str = ret['ID']+" "+ret['Name']+"的即時股價: "+ret['RealPrice']
+    result_str = ret['ID']+" "+ret['Name']+"的即時股價: "+str(ret['RealPrice'])
     context.bot.send_message(chat_id=update.effective_chat.id, text=result_str)
     ret['photo'].seek(0)
-    context.bot.send_photo(chat_id=update.effective_chat.id, photo=ret['photo'])
+    context.bot.send_photo(
+        chat_id=update.effective_chat.id, photo=ret['photo'])
 
 
 def inline_caps(update, context):
@@ -40,7 +42,7 @@ def inline_caps(update, context):
     try:
         results = list()
         ret = rtProvider.getStockInfo(query)
-        result_str = ret['ID']+" "+ret['Name']+"的即時股價: "+ret['RealPrice']
+        result_str = ret['ID']+" "+ret['Name']+"的即時股價: "+str(ret['RealPrice'])
         results.append(
             InlineQueryResultArticle(
                 id=query.upper(),
@@ -51,6 +53,62 @@ def inline_caps(update, context):
         context.bot.answer_inline_query(update.inline_query.id, results)
     except:
         return
+
+
+def notify(context):
+    symbolId = context.job.context[1]
+    price = context.job.context[2]
+    chat_id = context.job.context[0]
+    stockInfo = rtProvider.getStockInfo(symbolId)
+    if stockInfo['RealPrice'] <= price:
+        context.bot.send_message(
+            chat_id, text=stockInfo['ID']+" "+stockInfo['Name']+"目前的價格:"+str(stockInfo['RealPrice']))
+        context.job.schedule_removal()
+
+
+def removeNotify(context):
+    job = context.job.context[1]
+    job.schedule_removal()
+
+
+def maPriceChecker(context):
+    symbolId = context.job.context[1]
+    price = context.job.context[2]
+    chat_id = context.job.context[0]
+    ma = htProvider.getMA(symbolId)
+    notify_price = (1.0+(price/100))*ma
+    context.bot.send_message(chat_id, text="設定到價 %s 月線：%.2f 的 %d %%(%f)" % (symbolId,ma,price,notify_price))
+    new_job = context.job_queue.run_repeating(
+        notify, 30, context=[chat_id, symbolId, notify_price])
+    dt = datetime.time(
+        13, 20, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=8)))
+    context.job_queue.run_once(removeNotify, dt, context=[symbolId, new_job])
+
+
+def set_Notify(update, context):
+    """Add a job to the queue."""
+    chat_id = update.message.chat_id
+    try:
+        # args[0] should contain the time for the timer in seconds
+        symbolId = context.args[0]
+        price = int(context.args[1])
+        if price < 0 or price > 100:
+            update.message.reply_text("請設定%數(0-100))")
+            return
+        jobId = symbolId
+        # Add job to queue and stop current one if there is a timer already
+        if jobId+"_start" in context.chat_data:
+            context.chat_data[jobId+"_start"].schedule_removal()
+        dt = datetime.time(1, 11, 0, tzinfo=datetime.timezone(
+            datetime.timedelta(hours=8)))
+        new_job = context.job_queue.run_daily(maPriceChecker, dt, days=(
+            1, 2, 3, 4, 5), context=[chat_id, symbolId, price])
+        context.chat_data[jobId+"start"] = new_job
+
+        update.message.reply_text('到價通知設定完成')
+
+    except (IndexError, ValueError):
+        update.message.reply_text('Usage: /set 股價 %數')
 
 
 def unknown(update, context):
@@ -66,11 +124,16 @@ def main():
     echo_handler = MessageHandler(Filters.text, echo)
     dispatcher.add_handler(echo_handler)
     #Add unknow cmd handler
-    unknown_handler = MessageHandler(Filters.command, unknown)
-    dispatcher.add_handler(unknown_handler)
+
     #Add inline handler
     inline_caps_handler = InlineQueryHandler(inline_caps)
     dispatcher.add_handler(inline_caps_handler)
+    dispatcher.add_handler(CommandHandler("set", set_Notify,
+                                          pass_args=True,
+                                          pass_job_queue=True,
+                                          pass_chat_data=True))
+    unknown_handler = MessageHandler(Filters.command, unknown)
+    dispatcher.add_handler(unknown_handler)
     # start robot
     updater.start_polling()
 

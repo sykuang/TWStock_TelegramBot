@@ -7,7 +7,9 @@ fugle-realtime==0.2.7
 future==0.18.2
 idna==2.8
 kiwisolver==1.1.0
+lxml==4.5.0
 matplotlib==3.1.2
+multitasking==0.0.9
 numpy==1.18.1
 pandas==0.24.2
 pycparser==2.19
@@ -19,3 +21,4 @@ requests==2.22.0
 six==1.14.0
 tornado==6.0.3
 urllib3==1.25.8
+yfinance==0.1.54
