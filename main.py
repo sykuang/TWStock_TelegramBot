@@ -77,7 +77,8 @@ def maPriceChecker(context):
     chat_id = context.job.context[0]
     ma = htProvider.getMA(symbolId)
     notify_price = (1.0+(price/100))*ma
-    context.bot.send_message(chat_id, text="設定到價 %s 月線：%.2f 的 %d %%(%f)" % (symbolId,ma,price,notify_price))
+    context.bot.send_message(chat_id, text="設定到價 %s 月線：%.2f 的 %d %%(%f)" % (
+        symbolId, ma, price, notify_price))
     new_job = context.job_queue.run_repeating(
         notify, 30, context=[chat_id, symbolId, notify_price])
     dt = datetime.time(
@@ -95,20 +96,33 @@ def set_Notify(update, context):
         if price < 0 or price > 100:
             update.message.reply_text("請設定%數(0-100))")
             return
-        jobId = symbolId
+        jobId = symbolId+"_start"
         # Add job to queue and stop current one if there is a timer already
-        if jobId+"_start" in context.chat_data:
-            context.chat_data[jobId+"_start"].schedule_removal()
+        if jobId in context.chat_data:
+            context.chat_data[jobId].schedule_removal()
         dt = datetime.time(1, 11, 0, tzinfo=datetime.timezone(
             datetime.timedelta(hours=8)))
         new_job = context.job_queue.run_daily(maPriceChecker, dt, days=(
             1, 2, 3, 4, 5), context=[chat_id, symbolId, price])
-        context.chat_data[jobId+"start"] = new_job
+        context.chat_data[jobId] = new_job
 
         update.message.reply_text('到價通知設定完成')
 
     except (IndexError, ValueError):
-        update.message.reply_text('Usage: /set 股價 %數')
+        update.message.reply_text('Usage: /set 代號 %數')
+
+
+def unset_Notify(update, context):
+    chat_id = update.message.chat_id
+    try:
+        symbolId = context.args[0]
+        jobId = symbolId+"_start"
+        if jobId in context.chat_data:
+            update.message.reply_text("移除 %s 到價通知" % symbolId)
+            context.chat_data[jobId].schedule_removal()
+            del context.chat_data[jobId]
+    except:
+        update.message.reply_text('Usage: /unset 代號')
 
 
 def unknown(update, context):
@@ -129,6 +143,10 @@ def main():
     inline_caps_handler = InlineQueryHandler(inline_caps)
     dispatcher.add_handler(inline_caps_handler)
     dispatcher.add_handler(CommandHandler("set", set_Notify,
+                                          pass_args=True,
+                                          pass_job_queue=True,
+                                          pass_chat_data=True))
+    dispatcher.add_handler(CommandHandler("unset", unset_Notify,
                                           pass_args=True,
                                           pass_job_queue=True,
                                           pass_chat_data=True))
