@@ -16,8 +16,8 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
                     level=logging.INFO)
 
 
-rtProvider = fugle.realTimeProvider(TOKEN_FUGLE)
-htProvider = yahoo.historyProvider()
+rtProvider = fugle.fugle(TOKEN_FUGLE)
+htProvider = yahoo.yahoo()
 
 
 def start(update, context):
@@ -27,13 +27,16 @@ def start(update, context):
 
 def echo(update, context):
     query = update.message.text
-    ret = rtProvider.getStockInfo(query)
+    # ret = rtProvider.getStockInfo(query)
+    ret = htProvider.getTodayPrice(query)
     result_str = ret['ID']+" "+ret['Name']+"的即時股價: "+str(ret['RealPrice'])
     context.bot.send_message(chat_id=update.effective_chat.id, text=result_str)
     ret['photo'].seek(0)
     context.bot.send_photo(
         chat_id=update.effective_chat.id, photo=ret['photo'])
-
+    tendayMA_str = ("5日線:%.2f" % htProvider.getMA(query, "5d"))
+    moMA_str = ("月線:%.2f" % htProvider.getMA(query, "1mo"))
+    context.bot.send_message(chat_id=update.effective_chat.id, text=tendayMA_str+"\n"+moMA_str)
 
 def inline_caps(update, context):
     query = update.inline_query.query
@@ -100,7 +103,7 @@ def set_Notify(update, context):
         # Add job to queue and stop current one if there is a timer already
         if jobId in context.chat_data:
             context.chat_data[jobId].schedule_removal()
-        dt = datetime.time(1, 11, 0, tzinfo=datetime.timezone(
+        dt = datetime.time(8, 55, 0, tzinfo=datetime.timezone(
             datetime.timedelta(hours=8)))
         new_job = context.job_queue.run_daily(maPriceChecker, dt, days=(
             1, 2, 3, 4, 5), context=[chat_id, symbolId, price])

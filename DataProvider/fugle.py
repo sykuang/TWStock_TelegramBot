@@ -1,7 +1,6 @@
 from fugle_realtime import intraday
-import matplotlib.pyplot as plt
 import io
-class realTimeProvider:
+class fugle:
     def __init__(self, apiToken):
         self.apiToken = apiToken
 
