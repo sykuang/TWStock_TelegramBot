@@ -27,8 +27,7 @@ def start(update, context):
 
 def echo(update, context):
     query = update.message.text
-    # ret = rtProvider.getStockInfo(query)
-    ret = htProvider.getTodayPrice(query)
+    ret = rtProvider.getStockInfo(query)
     result_str = ret['ID']+" "+ret['Name']+"的即時股價: "+str(ret['RealPrice'])
     context.bot.send_message(chat_id=update.effective_chat.id, text=result_str)
     ret['photo'].seek(0)
