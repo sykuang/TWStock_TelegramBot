@@ -6,6 +6,7 @@ from telegram.ext import MessageHandler, Filters
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import InlineQueryHandler
 from DataProvider import fugle, yahoo
+from twstock import Stock
 import datetime
 import os
 TOKEN_TG = os.getenv("TOKEN_TG")
@@ -33,9 +34,12 @@ def echo(update, context):
     ret['photo'].seek(0)
     context.bot.send_photo(
         chat_id=update.effective_chat.id, photo=ret['photo'])
-    tendayMA_str = ("5日線:%.2f" % htProvider.getMA(query, "5d"))
-    moMA_str = ("月線:%.2f" % htProvider.getMA(query, "1mo"))
-    context.bot.send_message(chat_id=update.effective_chat.id, text=tendayMA_str+"\n"+moMA_str)
+    stock = Stock(query)
+    tendayMA_str = ("5日線:%.2f" % stock.moving_average(stock.price, 5)[-1])
+    moMA_str = ("月線:%.2f" % stock.moving_average(stock.price, 20)[-1])
+    context.bot.send_message(
+        chat_id=update.effective_chat.id, text=tendayMA_str+"\n"+moMA_str)
+
 
 def inline_caps(update, context):
     query = update.inline_query.query
